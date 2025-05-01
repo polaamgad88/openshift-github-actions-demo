@@ -1,4 +1,4 @@
-name: Deploy to OpenShift
+name: CI Pipeline - Flask App + OpenShift
 
 on:
   push:
@@ -6,12 +6,60 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-test-deploy:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Install dependencies
+      run: |
+        pip install flake8 black bandit pytest
+
+    - name: Code linting with flake8
+      run: flake8 app.py
+
+    - name: Code formatting check with black
+      run: black --check app.py
+
+    - name: Security scan with Bandit
+      run: bandit -r .
+
+    - name: Unit tests with pytest
+      run: pytest || echo "No tests found. Skipping."
+
+    - name: Build Docker image
+      run: docker build -t flask-linuxplus-demo:latest .
+
+    - name: Run container
+      run: |
+        docker run -d -p 5000:5000 --name test-container flask-linuxplus-demo
+        sleep 5
+
+    - name: Health check on container
+      run: |
+        curl -f http://localhost:5000/ || (echo "App failed to respond" && exit 1)
+
+    - name: Save Docker image to tarball
+      run: docker save flask-linuxplus-demo:latest -o flask-app.tar
+
+    - name: Upload image as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: flask-app-image
+        path: flask-app.tar
+
+    - name: Cleanup test container
+      if: always()
+      run: docker rm -f test-container || true
+
+    # ---- OpenShift Section (Executed Last) ----
 
     - name: Install OpenShift CLI
       run: |
@@ -26,8 +74,8 @@ jobs:
       run: |
         oc login --token=$OPENSHIFT_TOKEN --server=$OPENSHIFT_SERVER
 
-    - name: Build and push image (Placeholder)
-      run: echo "We'll fill this later with actual build steps"
+    - name: (Placeholder) Push image to OpenShift registry
+      run: echo "Image push step goes here when registry access is ready"
 
     - name: Rollout restart deployment
       run: |
