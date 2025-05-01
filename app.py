@@ -47,7 +47,7 @@ def home():
             </div>
 
             <div class="footer">
-                &copy; 2025 Linux-Plus | Built with ❤️ using Flask
+                &copy; 2025 Linux-Plus | Built with ❤️ using Flask and adel
             </div>
         </div>
 
