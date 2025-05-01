@@ -1,4 +1,4 @@
-name: Deploy to OpenShift
+name: Build and Deploy to OpenShift
 
 on:
   push:
@@ -6,29 +6,36 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Install OpenShift CLI
-      run: |
-        curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
-        tar -xzf openshift-client-linux.tar.gz
-        sudo mv oc kubectl /usr/local/bin/
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v3
 
     - name: Login to OpenShift
       env:
         OPENSHIFT_SERVER: ${{ secrets.OCP_SERVER }}
         OPENSHIFT_TOKEN: ${{ secrets.OCP_TOKEN }}
       run: |
-        oc login --token=$OPENSHIFT_TOKEN --server=$OPENSHIFT_SERVER
+        curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+        tar -xzf openshift-client-linux.tar.gz
+        sudo mv oc kubectl /usr/local/bin/
+        oc login --token=$OPENSHIFT_TOKEN --server=$OPENSHIFT_SERVER --insecure-skip-tls-verify
 
-    - name: Build and push image (Placeholder)
-      run: echo "We'll fill this later with actual build steps"
-
-    - name: Rollout restart deployment
+    - name: Login to internal OpenShift registry
       run: |
-        oc rollout restart deployment/myapp -n mynamespace
+        docker login -u kubeadmin -p $(oc whoami -t) image-registry.openshift-image-registry.svc:5000
+
+    - name: Build and push image to OpenShift registry
+      run: |
+        docker build -t flask-app .
+        docker tag flask-app image-registry.openshift-image-registry.svc:5000/flask-demo/flask-app:latest
+        docker push image-registry.openshift-image-registry.svc:5000/flask-demo/flask-app:latest
+
+    - name: Restart deployment in OpenShift
+      run: |
+        oc rollout restart deployment/flask-app -n flask-demo
