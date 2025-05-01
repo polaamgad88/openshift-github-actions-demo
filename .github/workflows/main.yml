@@ -1,0 +1,15 @@
+name: Self-Hosted Runner Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+    - name: Print hostname
+      run: hostname
+    - name: Print current directory
+      run: pwd
+    - name: Show OpenShift login status
+      run: oc whoami || echo "oc not installed"
